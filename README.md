@@ -47,6 +47,12 @@ Tools from the [Agentic Coding Flywheel Setup](https://github.com/Dicklesworthst
 |-------|-------------|----------|
 | **[giil](skills/giil/SKILL.md)** | Get Image [from] Internet Link - download full-resolution images from iCloud, Dropbox, Google Photos, Google Drive share links | "Download this screenshot: https://share.icloud.com/..." |
 
+### Documentation & Export
+
+| Skill | Description | Use Case |
+|-------|-------------|----------|
+| **[csctf](skills/csctf/SKILL.md)** | Chat Shared Conversation To File - convert ChatGPT, Gemini, Grok, and Claude share links to clean Markdown + HTML transcripts | "Save this conversation: https://chatgpt.com/share/..." |
+
 ### Development Tools
 
 | Skill | Description | Use Case |
