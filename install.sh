@@ -248,28 +248,18 @@ get_available_skills() {
 
 select_skills_gum() {
     local -a skills=("$@")
-    local -a options=()
 
-    # Build options with descriptions
-    for skill in "${skills[@]}"; do
-        local desc="${SKILL_DESCRIPTIONS[$skill]:-No description}"
-        local cat="${SKILL_CATEGORIES[$skill]:-Other}"
-        options+=("$skill|$desc|$cat")
-    done
+    # Print instructions to stderr so they're visible but not captured
+    echo -e "${BOLD}Select skills to install:${RESET}" >&2
+    echo -e "${DIM}(Space to select, Enter to confirm)${RESET}" >&2
+    echo "" >&2
 
-    echo -e "${BOLD}Select skills to install:${RESET}"
-    echo -e "${DIM}(Space to select, Enter to confirm, a to select all)${RESET}"
-    echo ""
-
-    # Use gum choose with multi-select
-    local selected
-    selected=$(printf '%s\n' "${skills[@]}" | gum choose --no-limit --height=20 \
+    # Use gum choose with multi-select - output goes to stdout for capture
+    printf '%s\n' "${skills[@]}" | gum choose --no-limit --height=20 \
         --header="Select skills (space to toggle, enter to confirm)" \
         --cursor.foreground="212" \
         --selected.foreground="212" \
-        --item.foreground="255" 2>/dev/null) || true
-
-    echo "$selected"
+        --item.foreground="255" 2>/dev/null || true
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -284,9 +274,10 @@ select_skills_bash() {
     # Group skills by category
     local -a categories=("Agentic Coding" "Cloud & Infrastructure" "Browser Automation" "Media & Image" "Documentation & Export" "Development Tools")
 
-    echo ""
-    echo -e "${BOLD}Available Skills:${RESET}"
-    echo -e "${DIM}────────────────────────────────────────────────────────────────────${RESET}"
+    # Print menu to stderr so it's visible but not captured
+    echo "" >&2
+    echo -e "${BOLD}Available Skills:${RESET}" >&2
+    echo -e "${DIM}────────────────────────────────────────────────────────────────────${RESET}" >&2
 
     local idx=1
     local -A skill_index=()
@@ -301,28 +292,29 @@ select_skills_bash() {
         done
 
         if $has_skills; then
-            echo ""
-            echo -e "${PEACH}${BOLD}$category${RESET}"
+            echo "" >&2
+            echo -e "${PEACH}${BOLD}$category${RESET}" >&2
 
             for skill in "${skills[@]}"; do
                 if [[ "${SKILL_CATEGORIES[$skill]:-Other}" == "$category" ]]; then
                     local desc="${SKILL_DESCRIPTIONS[$skill]:-No description}"
-                    printf "  ${CYAN}%2d${RESET}) ${BOLD}%-15s${RESET} ${DIM}%s${RESET}\n" "$idx" "$skill" "$desc"
+                    printf "  ${CYAN}%2d${RESET}) ${BOLD}%-15s${RESET} ${DIM}%s${RESET}\n" "$idx" "$skill" "$desc" >&2
                     skill_index[$idx]="$skill"
-                    ((idx++))
+                    idx=$((idx + 1))
                 fi
             done
         fi
     done
 
-    echo ""
-    echo -e "${DIM}────────────────────────────────────────────────────────────────────${RESET}"
-    echo ""
-    echo -e "${BOLD}Enter skill numbers to install (space or comma separated):${RESET}"
-    echo -e "${DIM}Examples: 1 2 3   or   1,2,3   or   1-5   or   all${RESET}"
-    echo ""
+    echo "" >&2
+    echo -e "${DIM}────────────────────────────────────────────────────────────────────${RESET}" >&2
+    echo "" >&2
+    echo -e "${BOLD}Enter skill numbers to install (space or comma separated):${RESET}" >&2
+    echo -e "${DIM}Examples: 1 2 3   or   1,2,3   or   1-5   or   all${RESET}" >&2
+    echo "" >&2
 
-    read -rp "Selection: " selection
+    # Read from /dev/tty to ensure we get user input even when stdout is redirected
+    read -rp "Selection: " selection </dev/tty
 
     # Parse selection
     if [[ "$selection" == "all" ]] || [[ "$selection" == "a" ]]; then
@@ -385,15 +377,15 @@ install_skills() {
 
         if [[ -L "$dst" ]]; then
             echo -e "  ${DIM}[skip]${RESET} $skill ${DIM}(already linked)${RESET}"
-            ((skipped++))
+            skipped=$((skipped + 1))
         elif [[ -d "$dst" ]]; then
             echo -e "  ${DIM}[skip]${RESET} $skill ${DIM}(directory exists)${RESET}"
-            ((skipped++))
+            skipped=$((skipped + 1))
         else
             # Copy instead of symlink for curl-pipe installs
             cp -r "$src" "$dst"
             echo -e "  ${GREEN}[install]${RESET} ${BOLD}$skill${RESET}"
-            ((installed++))
+            installed=$((installed + 1))
         fi
     done
 
@@ -405,7 +397,8 @@ install_skills() {
         log_info "Skipped $skipped skill(s) (already installed)"
     fi
 
-    echo "$installed"
+    # Return count via global variable to avoid stdout capture issues
+    INSTALLED_COUNT=$installed
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -448,7 +441,7 @@ uninstall_skills() {
         if [[ -d "$target" ]] || [[ -L "$target" ]]; then
             rm -rf "$target"
             echo -e "  ${RED}[remove]${RESET} $skill"
-            ((removed++))
+            removed=$((removed + 1))
         fi
     done
 
@@ -662,11 +655,11 @@ main() {
     fi
 
     # Install selected skills
-    local installed_count
-    installed_count=$(install_skills "$repo_dir" "$skills_dst" "${selected_skills[@]}")
+    INSTALLED_COUNT=0
+    install_skills "$repo_dir" "$skills_dst" "${selected_skills[@]}"
 
     # Show config snippet
-    if $show_config && [[ $installed_count -gt 0 ]]; then
+    if $show_config && [[ $INSTALLED_COUNT -gt 0 ]]; then
         generate_config_snippet "${selected_skills[@]}"
     fi
 
