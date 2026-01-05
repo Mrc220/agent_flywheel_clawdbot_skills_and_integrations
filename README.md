@@ -1,10 +1,10 @@
 # Agent Flywheel Clawdbot Skills & Integrations
 
-> A curated collection of [Clawdbot](https://github.com/anthropics/clawdbot) skills for professional agentic coding workflows. Includes skills for the [Agentic Coding Flywheel Setup (ACFS)](https://github.com/Dicklesworthstone/agentic_coding_flywheel_setup) toolkit and popular cloud/dev infrastructure CLIs.
+> A curated collection of [Clawdbot](https://github.com/steipete/clawdbot) skills for professional agentic coding workflows. Includes skills for the [Agentic Coding Flywheel Setup (ACFS)](https://github.com/Dicklesworthstone/agentic_coding_flywheel_setup) toolkit and popular cloud/dev infrastructure CLIs.
 
 ## What Are Clawdbot Skills?
 
-Skills are markdown files that teach Clawdbot (Anthropic's multi-surface AI assistant) how to use command-line tools. Each skill contains:
+Skills are markdown files that teach Clawdbot (a multi-surface AI assistant by Peter Steinberger) how to use command-line tools. Each skill contains:
 - Tool description and purpose
 - Command syntax and examples
 - Best practices and common workflows
@@ -272,7 +272,7 @@ More examples...
 
 ## Related Projects
 
-- **[Clawdbot](https://github.com/anthropics/clawdbot)** - The AI assistant that uses these skills
+- **[Clawdbot](https://github.com/steipete/clawdbot)** - The AI assistant that uses these skills
 - **[ACFS](https://github.com/Dicklesworthstone/agentic_coding_flywheel_setup)** - Bootstrap for AI dev environments
 - **[MCP Agent Mail](https://github.com/Dicklesworthstone/mcp_agent_mail)** - Agent coordination server
 - **[Named Tmux Manager](https://github.com/Dicklesworthstone/ntm)** - Multi-agent tmux orchestration
