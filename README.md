@@ -1,6 +1,28 @@
 # Agent Flywheel Clawdbot Skills & Integrations
 
-> A curated collection of [Clawdbot](https://github.com/steipete/clawdbot) skills for professional agentic coding workflows. Includes skills for the [Agentic Coding Flywheel Setup (ACFS)](https://github.com/Dicklesworthstone/agentic_coding_flywheel_setup) toolkit and popular cloud/dev infrastructure CLIs.
+> A curated collection of [Clawdbot](https://github.com/steipete/clawdbot) skills for professional agentic coding workflows. Includes skills for the [Agentic Coding Flywheel Setup (ACFS)](https://github.com/Dicklesworthstone/agentic_coding_flywheel_setup) toolkit, workflow methodologies, and popular cloud/dev infrastructure CLIs.
+
+## Security: ACIP Integration
+
+**Important:** If you're exposing Clawdbot to external inputs (WhatsApp, Telegram, Discord, email, web), you should install the [ACIP (Advanced Cognitive Inoculation Prompt)](https://github.com/Dicklesworthstone/acip) security layer.
+
+Clawdbot has extensive access to messaging platforms, files, shell commands, and web browsing, making it a high-value target for prompt injection attacks. Someone could send you a message designed to trick Clawdbot into revealing secrets or executing malicious commands.
+
+### Quick ACIP Install
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/Dicklesworthstone/acip/main/integrations/clawdbot/install.sh" | bash
+```
+
+This installs `SECURITY.md` into your Clawdbot config with cognitive defenses that:
+- Establish trust boundaries between owner commands and external data
+- Protect system prompts, configs, and credentials from disclosure
+- Require confirmation before sending sensitive messages
+- Recognize attack patterns (false authority claims, urgency tactics, encoding tricks)
+
+See the [ACIP Clawdbot Integration](https://github.com/Dicklesworthstone/acip/tree/main/integrations/clawdbot) for details.
+
+---
 
 ## What Are Clawdbot Skills?
 
@@ -21,10 +43,32 @@ Tools from the [Agentic Coding Flywheel Setup](https://github.com/Dicklesworthst
 |-------|-------------|----------|
 | **[ntm](skills/ntm/SKILL.md)** | Named Tmux Manager - orchestrate Claude Code, Codex, and Gemini in tiled tmux panes | "Start a 3-agent session for the API refactor" |
 | **[agent-mail](skills/agent-mail/SKILL.md)** | MCP Agent Mail - coordination layer with mailboxes and file reservations | "Check if any files are reserved for auth module" |
-| **[bv](skills/bv/SKILL.md)** | Beads Viewer - TUI for task management with dependency graphs | "Show me the task graph for current sprint" |
+| **[bv](skills/bv/SKILL.md)** | Beads Viewer - graph-aware triage engine with 9 metrics (PageRank, betweenness, etc.) | "Show me the task graph for current sprint" |
 | **[cass](skills/cass/SKILL.md)** | Coding Agent Session Search - unified history from all AI coding agents | "Search my history for auth implementations" |
-| **[cm](skills/cm/SKILL.md)** | CASS Memory System - procedural memory and rule playbook | "What patterns did we learn from the refactor?" |
+| **[cm](skills/cm/SKILL.md)** | CASS Memory System - procedural memory with confidence decay | "What patterns did we learn from the refactor?" |
 | **[slb](skills/slb/SKILL.md)** | Simultaneous Launch Button - two-person rule for dangerous commands | "Run the migration with peer review" |
+| **[dcg](skills/dcg/SKILL.md)** | Destructive Command Guard - Claude Code hook that blocks dangerous commands | "Block rm -rf and git push --force" |
+| **[ru](skills/ru/SKILL.md)** | Repo Updater - sync dozens of GitHub repos with one command | "Update all my repos in parallel" |
+
+### Workflow Methodologies
+
+Skills that encode proven workflows and prompts for multi-agent development:
+
+| Skill | Description | Use Case |
+|-------|-------------|----------|
+| **[planning-workflow](skills/planning-workflow/SKILL.md)** | 85%+ time on planning methodology with exact prompts | "How should I plan this feature?" |
+| **[beads-workflow](skills/beads-workflow/SKILL.md)** | Converting detailed plans into beads task structure | "Turn this plan into trackable tasks" |
+| **[agent-swarm-workflow](skills/agent-swarm-workflow/SKILL.md)** | Multi-agent implementation workflow with marching orders | "How do I coordinate 5 agents on this?" |
+| **[agent-fungibility](skills/agent-fungibility/SKILL.md)** | Philosophy of interchangeable generalist agents | "Should I specialize my agents?" |
+| **[ui-ux-polish](skills/ui-ux-polish/SKILL.md)** | Iterative Stripe-level UI polish with exact prompt | "Make this look world-class" |
+| **[de-slopify](skills/de-slopify/SKILL.md)** | Remove AI writing artifacts from documentation | "Clean up the AI slop in this README" |
+| **[tanstack-integration](skills/tanstack-integration/SKILL.md)** | Strategic TanStack library adoption (avoid man-with-hammer) | "Should I use TanStack Query here?" |
+
+### Discord Integration
+
+| Skill | Description | Use Case |
+|-------|-------------|----------|
+| **[flywheel-discord](skills/flywheel-discord/SKILL.md)** | Security rules for Discord community assistant | "Respond to Discord without leaking secrets" |
 
 ### Cloud & Infrastructure
 
@@ -127,13 +171,23 @@ cp -r skills/ntm ~/.clawdbot/skills/
 {
   "skills": {
     "entries": {
-      "gcloud": { "enabled": true },
       "ntm": { "enabled": true },
       "agent-mail": { "enabled": true },
       "bv": { "enabled": true },
       "cass": { "enabled": true },
       "cm": { "enabled": true },
       "slb": { "enabled": true },
+      "dcg": { "enabled": true },
+      "ru": { "enabled": true },
+      "planning-workflow": { "enabled": true },
+      "beads-workflow": { "enabled": true },
+      "agent-swarm-workflow": { "enabled": true },
+      "agent-fungibility": { "enabled": true },
+      "ui-ux-polish": { "enabled": true },
+      "de-slopify": { "enabled": true },
+      "tanstack-integration": { "enabled": true },
+      "flywheel-discord": { "enabled": true },
+      "gcloud": { "enabled": true },
       "wrangler": { "enabled": true },
       "vercel": { "enabled": true },
       "supabase": { "enabled": true },
@@ -169,7 +223,13 @@ Or install individual tools:
 - **cass**: `cargo install cass` or build from source
 - **cm**: `cargo install cm` or build from source
 - **slb**: `cargo install slb` or build from source
+- **dcg**: `cargo install dcg` or build from source (Claude Code hook)
+- **ru**: Bash script (see [repo](https://github.com/Dicklesworthstone/repo_updater))
 - **agent-mail**: Python MCP server (see [repo](https://github.com/Dicklesworthstone/mcp_agent_mail))
+
+### Workflow Skills
+
+The workflow methodology skills (planning-workflow, beads-workflow, agent-swarm-workflow, agent-fungibility, ui-ux-polish, de-slopify, tanstack-integration) are **pure knowledge** and don't require any external tools. They encode proven prompts and workflows.
 
 ### Cloud CLIs
 
@@ -273,11 +333,15 @@ More examples...
 ## Related Projects
 
 - **[Clawdbot](https://github.com/steipete/clawdbot)** - The AI assistant that uses these skills
+- **[ACIP](https://github.com/Dicklesworthstone/acip)** - Cognitive inoculation for prompt injection defense
 - **[ACFS](https://github.com/Dicklesworthstone/agentic_coding_flywheel_setup)** - Bootstrap for AI dev environments
 - **[MCP Agent Mail](https://github.com/Dicklesworthstone/mcp_agent_mail)** - Agent coordination server
 - **[Named Tmux Manager](https://github.com/Dicklesworthstone/ntm)** - Multi-agent tmux orchestration
-- **[CASS](https://github.com/Dicklesworthstone/cass)** - Agent session search
-- **[Beads Viewer](https://github.com/Dicklesworthstone/bv)** - Task management TUI
+- **[CASS](https://github.com/Dicklesworthstone/coding_agent_session_search)** - Agent session search
+- **[CASS Memory](https://github.com/Dicklesworthstone/cass_memory_system)** - Procedural memory for agents
+- **[Beads Viewer](https://github.com/Dicklesworthstone/beads_viewer)** - Graph-aware task triage
+- **[DCG](https://github.com/Dicklesworthstone/destructive_command_guard)** - Block dangerous commands
+- **[Repo Updater](https://github.com/Dicklesworthstone/repo_updater)** - Sync multiple repos
 
 ## License
 
