@@ -117,7 +117,7 @@ cass index --watch
 # Force rebuild even if schema unchanged
 cass index --full --force-rebuild
 
-# Safe retries with idempotency key
+# Safe retries with idempotency key (24h TTL)
 cass index --full --idempotency-key "build-$(date +%Y%m%d)"
 
 # JSON output with stats
@@ -164,7 +164,7 @@ cass search "authentication error" --robot --highlight
 cass search "auth*" --robot --explain    # parsed query, cost estimates
 cass search "auth error" --robot --dry-run  # validate without executing
 
-# Aggregations
+# Aggregations (server-side counts)
 cass search "error" --robot --aggregate agent,workspace,date
 
 # Request correlation
@@ -173,6 +173,9 @@ cass search "bug" --robot --request-id "req-12345"
 # Source filtering (for multi-machine setups)
 cass search "auth" --robot --source laptop
 cass search "error" --robot --source remote
+
+# Traceability (for debugging agent pipelines)
+cass search "error" --robot --trace-file /tmp/cass-trace.json
 ```
 
 ### Session Analysis
@@ -218,11 +221,40 @@ cass stats --by-source  # for multi-machine
 cass diag --verbose
 ```
 
-### Remote Sources (Multi-Machine Search)
+---
+
+## Aggregation & Analytics
+
+Aggregate search results server-side to get counts and distributions without transferring full result data:
+
+```bash
+# Count results by agent
+cass search "error" --robot --aggregate agent
+# → { "aggregations": { "agent": { "buckets": [{"key": "claude_code", "count": 45}, ...] } } }
+
+# Multi-field aggregation
+cass search "bug" --robot --aggregate agent,workspace,date
+
+# Combine with filters
+cass search "TODO" --agent claude --robot --aggregate workspace
+```
+
+| Aggregation Field | Description |
+|-------------------|-------------|
+| `agent` | Group by agent type (claude_code, codex, cursor, etc.) |
+| `workspace` | Group by workspace/project path |
+| `date` | Group by date (YYYY-MM-DD) |
+| `match_type` | Group by match quality (exact, prefix, fuzzy) |
+
+Top 10 buckets returned per field, with `other_count` for remaining items.
+
+---
+
+## Remote Sources (Multi-Machine Search)
 
 Search across sessions from multiple machines via SSH/rsync.
 
-#### Setup Wizard (Recommended)
+### Setup Wizard (Recommended)
 
 ```bash
 cass sources setup
@@ -242,7 +274,7 @@ cass sources setup --dry-run             # Preview without changes
 cass sources setup --resume              # Resume interrupted setup
 ```
 
-#### Manual Setup
+### Manual Setup
 
 ```bash
 # Add a remote machine
@@ -271,15 +303,6 @@ cass sources remove laptop --purge -y
 
 Configuration stored in `~/.config/cass/sources.toml` (Linux) or `~/Library/Application Support/cass/sources.toml` (macOS).
 
-### Shell Completions
-
-```bash
-cass completions bash > ~/.local/share/bash-completion/completions/cass
-cass completions zsh > "${fpath[1]}/_cass"
-cass completions fish > ~/.config/fish/completions/cass.fish
-cass completions powershell >> $PROFILE
-```
-
 ---
 
 ## Robot Mode Deep Dive
@@ -303,6 +326,8 @@ cass robot-docs schemas    # response JSON schemas
 cass robot-docs examples   # copy-paste invocations
 cass robot-docs exit-codes # error handling
 cass robot-docs guide      # quick-start walkthrough
+cass robot-docs contracts  # API versioning
+cass robot-docs sources    # remote sources guide
 ```
 
 ### Forgiving Syntax (Agent-Friendly)
@@ -318,12 +343,12 @@ CASS auto-corrects common mistakes:
 | `cass --limt 5` | `cass --limit 5` (Levenshtein <=2) |
 
 **Command Aliases:**
-- `find`, `query`, `q`, `lookup`, `grep` -> `search`
-- `ls`, `list`, `info`, `summary` -> `stats`
-- `st`, `state` -> `status`
-- `reindex`, `idx`, `rebuild` -> `index`
-- `show`, `get`, `read` -> `view`
-- `docs`, `help-robot`, `robotdocs` -> `robot-docs`
+- `find`, `query`, `q`, `lookup`, `grep` → `search`
+- `ls`, `list`, `info`, `summary` → `stats`
+- `st`, `state` → `status`
+- `reindex`, `idx`, `rebuild` → `index`
+- `show`, `get`, `read` → `view`
+- `docs`, `help-robot`, `robotdocs` → `robot-docs`
 
 ### Output Formats
 
@@ -358,7 +383,9 @@ LLMs have context limits. Control output size:
 
 Truncated fields include `*_truncated: true` indicator.
 
-### Structured Error Handling
+---
+
+## Structured Error Handling
 
 Errors are JSON with actionable hints:
 
@@ -388,50 +415,6 @@ Errors are JSON with actionable hints:
 | 7 | Lock/busy | Retry later |
 | 8 | Partial result | Increase `--timeout` |
 | 9 | Unknown error | Check `retryable` flag |
-
-### Response Shapes
-
-**Search Response:**
-```json
-{
-  "query": "error",
-  "limit": 10,
-  "offset": 0,
-  "count": 5,
-  "total_matches": 42,
-  "hits": [
-    {
-      "source_path": "/path/to/session.jsonl",
-      "line_number": 123,
-      "agent": "claude_code",
-      "workspace": "/projects/myapp",
-      "title": "Authentication debugging",
-      "snippet": "The error occurs when...",
-      "score": 0.85,
-      "match_type": "exact",
-      "created_at": "2024-01-15T10:30:00Z"
-    }
-  ],
-  "_meta": {
-    "elapsed_ms": 12,
-    "cache_hit": true,
-    "wildcard_fallback": false,
-    "next_cursor": "eyJ...",
-    "index_freshness": { "stale": false, "age_seconds": 120 }
-  }
-}
-```
-
-**Status Response:**
-```json
-{
-  "healthy": true,
-  "recommended_action": null,
-  "index": { "exists": true, "fresh": true, "age_seconds": 120 },
-  "database": { "conversations": 500, "messages": 10000 },
-  "pending": { "sessions": 0, "watch_active": true }
-}
-```
 
 ---
 
@@ -532,8 +515,54 @@ Results include `match_type`:
 ### Auto-Fuzzy Fallback
 
 When exact query returns <3 results, CASS automatically retries with wildcards:
-- `auth` -> `*auth*`
+- `auth` → `*auth*`
 - Results flagged with `wildcard_fallback: true`
+
+### Flexible Time Input
+
+CASS accepts a wide variety of time/date formats:
+
+| Format | Examples |
+|--------|----------|
+| **Relative** | `-7d`, `-24h`, `-30m`, `-1w` |
+| **Keywords** | `now`, `today`, `yesterday` |
+| **ISO 8601** | `2024-11-25`, `2024-11-25T14:30:00Z` |
+| **US Dates** | `11/25/2024`, `11-25-2024` |
+| **Unix Timestamp** | `1732579200` (seconds or milliseconds) |
+
+---
+
+## Ranking Modes
+
+Cycle with `F12` in TUI or use `--ranking` flag:
+
+| Mode | Formula | Best For |
+|------|---------|----------|
+| **Recent Heavy** | `relevance*0.3 + recency*0.7` | "What was I working on?" |
+| **Balanced** | `relevance*0.5 + recency*0.5` | General search |
+| **Relevance** | `relevance*0.8 + recency*0.2` | "Best explanation of X" |
+| **Match Quality** | Penalizes fuzzy matches | Precise technical searches |
+| **Date Newest** | Pure chronological | Recent activity |
+| **Date Oldest** | Reverse chronological | "When did I first..." |
+
+### Score Components
+
+- **Text Relevance (BM25)**: Term frequency, inverse document frequency, length normalization
+- **Recency**: Exponential decay (today ~1.0, last week ~0.7, last month ~0.3)
+- **Match Exactness**: Exact phrase=1.0, Prefix=0.9, Suffix=0.8, Substring=0.6, Fuzzy=0.4
+
+### Blended Scoring Formula
+
+```
+Final_Score = BM25_Score × Match_Quality + α × Recency_Factor
+```
+
+| Mode | α Value | Effect |
+|------|---------|--------|
+| Recent Heavy | 1.0 | Recency dominates |
+| Balanced | 0.4 | Moderate recency boost |
+| Relevance Heavy | 0.1 | BM25 dominates |
+| Match Quality | 0.0 | Pure text matching |
 
 ---
 
@@ -569,29 +598,37 @@ Launch with `cass` (no flags):
 - `Tab/Shift+Tab`: Cycle focus
 - `Enter`: Open in `$EDITOR`
 - `Space`: Full-screen detail view
+- `Home/End`: Jump to first/last result
+- `PageUp/PageDown`: Scroll by page
 
 **Filtering:**
 - `F3`: Agent filter
 - `F4`: Workspace filter
-- `F5/F6`: Time filters
+- `F5/F6`: Time filters (from/to)
+- `Shift+F3`: Scope to current result's agent
+- `Shift+F4`: Clear workspace filter
 - `Shift+F5`: Cycle presets (24h/7d/30d/all)
 - `Ctrl+Del`: Clear all filters
 
 **Modes:**
-- `F2`: Toggle dark/light theme
+- `F2`: Toggle theme (6 presets)
 - `F7`: Context window size (S/M/L/XL)
 - `F9`: Match mode (prefix/standard)
-- `F12`: Ranking mode (recent/balanced/relevance/quality/newest/oldest)
+- `F12`: Ranking mode
 - `Ctrl+B`: Toggle border style
 
-**Actions:**
+**Selection & Actions:**
 - `m`: Toggle selection
 - `Ctrl+A`: Select all
+- `A`: Bulk actions menu
 - `Ctrl+Enter`: Add to queue
 - `Ctrl+O`: Open all queued
 - `y`: Copy path/content
+- `Ctrl+Y`: Copy all selected
 - `/`: Find in detail pane
 - `n/N`: Next/prev match
+
+**Views & Palette:**
 - `Ctrl+P`: Command palette
 - `1-9`: Load saved view
 - `Shift+1-9`: Save view to slot
@@ -600,20 +637,104 @@ Launch with `cass` (no flags):
 - `F11`: Cycle source filter (all/local/remote)
 - `Shift+F11`: Source selection menu
 
+**Global:**
+- `Ctrl+C`: Quit
+- `F1` or `?`: Toggle help
+- `Ctrl+Shift+R`: Force re-index
+- `Ctrl+Shift+Del`: Reset all TUI state
+
+### Detail Pane Tabs
+
+| Tab | Content | Switch With |
+|-----|---------|-------------|
+| **Messages** | Full conversation with markdown | `[` / `]` |
+| **Snippets** | Keyword-extracted summaries | `[` / `]` |
+| **Raw** | Unformatted JSON/text | `[` / `]` |
+
+### Context Window Sizing
+
+| Size | Characters | Use Case |
+|------|------------|----------|
+| **Small** | ~200 | Quick scanning |
+| **Medium** | ~400 | Default balanced view |
+| **Large** | ~800 | Longer passages |
+| **XLarge** | ~1600 | Full context, code review |
+
+**Peek Mode** (`Ctrl+Space`): Temporarily expand to XL without changing default.
+
 ---
 
-## Ranking Modes
+## Theme Presets
 
-Cycle with `F12` in TUI or use `--ranking` flag:
+Cycle through 6 built-in themes with `F2`:
 
-| Mode | Formula | Best For |
-|------|---------|----------|
-| **Recent Heavy** | `relevance*0.3 + recency*0.7` | "What was I working on?" |
-| **Balanced** | `relevance*0.5 + recency*0.5` | General search |
-| **Relevance** | `relevance*0.8 + recency*0.2` | "Best explanation of X" |
-| **Match Quality** | Penalizes fuzzy matches | Precise technical searches |
-| **Date Newest** | Pure chronological | Recent activity |
-| **Date Oldest** | Reverse chronological | "When did I first..." |
+| Theme | Description | Best For |
+|-------|-------------|----------|
+| **Dark** | Tokyo Night-inspired deep blues | Low-light environments |
+| **Light** | High-contrast light background | Bright environments |
+| **Catppuccin** | Warm pastels, reduced eye strain | All-day coding |
+| **Dracula** | Purple-accented dark theme | Popular developer theme |
+| **Nord** | Arctic-inspired cool tones | Calm, focused work |
+| **High Contrast** | Maximum readability | Accessibility needs |
+
+All themes validated against WCAG contrast requirements (4.5:1 minimum for text).
+
+### Role-Aware Message Styling
+
+| Role | Visual Treatment |
+|------|------------------|
+| **User** | Blue-tinted background, bold |
+| **Assistant** | Green-tinted background |
+| **System** | Gray/muted background |
+| **Tool** | Orange-tinted background |
+
+---
+
+## Saved Views
+
+Save filter configurations to 9 slots for instant recall.
+
+**What Gets Saved:**
+- Active filters (agent, workspace, time range)
+- Current ranking mode
+- The search query
+
+**Keyboard:**
+- `Shift+1` through `Shift+9`: Save current view
+- `1` through `9`: Load view from slot
+
+**Via Command Palette:** `Ctrl+P` → "Save/Load view"
+
+Views persist in `tui_state.json` across sessions.
+
+---
+
+## Density Modes
+
+Control lines per search result. Cycle with `Shift+D`:
+
+| Mode | Lines | Best For |
+|------|-------|----------|
+| **Compact** | 3 | Maximum results visible |
+| **Cozy** | 5 | Balanced view (default) |
+| **Spacious** | 8 | Detailed preview |
+
+---
+
+## Bookmark System
+
+Save important results with notes and tags:
+
+In TUI: Press `b` to bookmark, add notes and tags.
+
+**Bookmark Structure:**
+- `title`: Short description
+- `source_path`, `line_number`, `agent`, `workspace`
+- `note`: Your annotations
+- `tags`: Comma-separated labels
+- `snippet`: Extracted content
+
+Storage: `~/.local/share/coding-agent-search/bookmarks.db` (SQLite)
 
 ---
 
@@ -632,24 +753,7 @@ Vector index stored as `vector_index/index-minilm-384.cvvi`.
 
 CASS does NOT auto-download models; you must manually install them.
 
----
-
-## Bookmarks
-
-Save important results for later:
-
-```bash
-# Bookmarks stored in SQLite: ~/.local/share/coding-agent-search/bookmarks.db
-```
-
-In TUI: Press `b` to bookmark, add notes and tags.
-
-Bookmark structure:
-- `title`: Short description
-- `source_path`, `line_number`, `agent`, `workspace`
-- `note`: Your annotations
-- `tags`: Comma-separated labels
-- `snippet`: Extracted content
+**Hash Embedder Fallback:** When MiniLM not installed, CASS uses a hash-based embedder for approximate semantic similarity.
 
 ---
 
@@ -669,6 +773,21 @@ TUI automatically starts watch mode in background.
 
 ---
 
+## Deduplication Strategy
+
+CASS uses multi-layer deduplication:
+
+1. **Message Hash**: SHA-256 of `(role + content + timestamp)` - identical messages stored once
+2. **Conversation Fingerprint**: Hash of first N message hashes - detects duplicate files
+3. **Search-Time Dedup**: Results deduplicated by content similarity
+
+**Noise Filtering:**
+- Empty messages and pure whitespace
+- System prompts (unless searching for them)
+- Repeated tool acknowledgments
+
+---
+
 ## Performance Characteristics
 
 | Operation | Latency |
@@ -685,6 +804,55 @@ TUI automatically starts watch mode in background.
 
 ---
 
+## Response Shapes
+
+**Search Response:**
+```json
+{
+  "query": "error",
+  "limit": 10,
+  "count": 5,
+  "total_matches": 42,
+  "hits": [
+    {
+      "source_path": "/path/to/session.jsonl",
+      "line_number": 123,
+      "agent": "claude_code",
+      "workspace": "/projects/myapp",
+      "title": "Authentication debugging",
+      "snippet": "The error occurs when...",
+      "score": 0.85,
+      "match_type": "exact",
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "_meta": {
+    "elapsed_ms": 12,
+    "cache_hit": true,
+    "wildcard_fallback": false,
+    "next_cursor": "eyJ...",
+    "index_freshness": { "stale": false, "age_seconds": 120 }
+  }
+}
+```
+
+**Aggregation Response:**
+```json
+{
+  "aggregations": {
+    "agent": {
+      "buckets": [
+        {"key": "claude_code", "count": 120},
+        {"key": "codex", "count": 85}
+      ],
+      "other_count": 15
+    }
+  }
+}
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Purpose |
@@ -696,6 +864,35 @@ TUI automatically starts watch mode in background.
 | `CASS_CACHE_TOTAL_CAP` | Total cached hits (default 2048) |
 | `CASS_DEBUG_CACHE_METRICS` | Enable cache debug logging |
 | `CODING_AGENT_SEARCH_NO_UPDATE_PROMPT` | Skip update checks |
+
+---
+
+## Shell Completions
+
+```bash
+cass completions bash > ~/.local/share/bash-completion/completions/cass
+cass completions zsh > "${fpath[1]}/_cass"
+cass completions fish > ~/.config/fish/completions/cass.fish
+cass completions powershell >> $PROFILE
+```
+
+---
+
+## API Contract & Versioning
+
+```bash
+cass api-version --json
+# → { "version": "0.4.0", "contract_version": "1", "breaking_changes": [] }
+
+cass introspect --json
+# → Full schema: all commands, arguments, response types
+```
+
+**Guaranteed Stable:**
+- Exit codes and their meanings
+- JSON response structure for `--robot` output
+- Flag names and behaviors
+- `_meta` block format
 
 ---
 
@@ -729,35 +926,6 @@ cm reflect
 
 ---
 
-## Ready-to-Paste AGENTS.md Blurb
-
-```
-## cass - Coding Agent Session Search
-
-Search all your agent histories (Claude, Codex, Cursor, Gemini, Aider, etc.) from a unified index.
-
-**NEVER run bare `cass`** - it launches an interactive TUI. Always use `--robot` or `--json`.
-
-### Quick Start
-cass health                                    # Pre-flight check
-cass search "auth error" --robot --limit 5     # Search
-cass view /path/session.jsonl -n 42 --json     # View result
-cass expand /path/session.jsonl -n 42 -C 3 --json  # Context
-
-### Key Flags
-| Flag | Purpose |
-|------|---------|
-| --robot / --json | Machine-readable output (required!) |
-| --fields minimal | Reduce payload size |
-| --limit N | Cap results |
-| --agent NAME | Filter by agent |
-| --days N | Recent N days |
-
-stdout = JSON only, stderr = diagnostics. Exit 0 = success.
-```
-
----
-
 ## Installation
 
 ```bash
@@ -768,3 +936,14 @@ curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/coding_agent_sess
 # Windows
 irm https://raw.githubusercontent.com/Dicklesworthstone/coding_agent_session_search/main/install.ps1 | iex
 ```
+
+---
+
+## Integration with Flywheel
+
+| Tool | Integration |
+|------|-------------|
+| **CM** | CASS provides episodic memory, CM extracts procedural memory |
+| **NTM** | Robot mode flags for searching past sessions |
+| **Agent Mail** | Search threads across agent history |
+| **BV** | Cross-reference beads with past solutions |
